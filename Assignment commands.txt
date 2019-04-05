@@ -1,0 +1,152 @@
+Rohan Rao
+Reg No:181046030
+
+1. mysql
+
+create database battingdb;
+
+use battingdb;
+
+
+
+create table batting(playerID varchar(30),yearID int,stint int,teamID varchar(10),lgID varchar(10),G int,G_batting int,AB int,R int,H int,2B int,3B int,HR int,RBI int,SB int,CS int,BB int,SO int,IBB int,HBP int,SH int,SF int,GIDP int,G_old int);
+
+Load data infile '/home/cloudera/Lab/DataFiles/Batting1.csv' into table batting fields terminated by ',' Lines terminated by '\n';
+
+2.sqooping for hdfs
+
+sqoop import --connect jdbc:mysql://localhost/battingdb --username root --password cloudera --table batting --m 1
+
+hdfs dfs -cat /user/cloudera/batting/part-m-00000;
+
+
+
+
+
+3***Hive type command 
+>>hive;
+
+create database battingdb;
+
+use battingdb;
+
+
+
+create table batting(playerID STRING,yearID int,stint int,teamID STRING,lgID STRING,G int,G_batting int,AB int,R int,H int,twoB int,threeB int,HR int,RBI int,SB int,CS int,BB int,SO int,IBB int,HBP int,SH int,SF int,GIDP int,G_old int) row format delimited fields terminated by ',' stored as textfile;
+
+LOAD DATA LOCAL INPATH '/home/cloudera/Lab/DataFiles/Batting1.csv' into table batting;
+
+
+4. Implement a PIG script to 
+a) Find the total count of participation of G 112
+b) Find the player details with "david" 
+c) Find the average count of "NL"
+d) Find the count of teams
+
+
+a)
+
+batting_list = LOAD '/home/cloudera/Lab/DataFiles/Batting1.csv' USING PigStorage(',') as (playerID:chararray,yearID:int,stint:int,teamID:chararray,lgID:chararray,G:int,G_batting:int,AB:int,R:int,H:int,B2:int,B3:int,HR:int,RBI:int,SB:int,CS:int,BB:int,SO:int,IBB:int,HBP:int,SH:int,SF:int,GIDP:int,G_old:int);
+
+dump batting_list;
+
+
+count_g = FILTER batting_list BY G == 112;
+
+group_count_g  = GROUP count_g All;
+
+total_count = foreach group_count_g Generate COUNT(count_g.G);
+dump total_count;
+ 
+store total_count  into 'count_g112'; 
+
+b)david  = Filter batting_list by(playerID MATCHES 'david.*');
+dump david;
+
+
+c)
+NL_filter = Filter batting_list by lgID =='NL';
+NL_Group = Group NL_filter All;
+NL_avg = foreach NL_Group Generate AVG(NL_filter.G_batting);
+DUMP NL_avg
+
+d)
+Find the count of teams;
+
+team_count = GROUP batting_list by teamID;
+team_group = GROUP team_count All;
+result_count = Foreach team_group Generate COUNT(team_count);
+dump result_count
+
+
+5. Implement a Hive script to
+a) Find the total count of player details with "david"
+b) Create a patition on the TEAMID
+c) Create 3 buckets on the partition.
+d) Extract the details on player "aaronha01"
+e) Find the count of teams
+
+a)
+select count(*) from batting where playerID REGEXP 'david[a-z]*';
+
+
+b) and c)
+create table batting_part(playerID STRING, yearID INT, stint INT, lgID STRING, G INT, G_batting INT, AB INT, R INT, H INT, twoB INT, threeB INT, HR INT, RBI INT, SB INT, CS INT, BB INT, SO INT, IBB INT, HBP INT, SH INT, SF INT, GIDP INT, G_old INT) 
+partitioned by(teamID STRING)
+clustered by (playerID) INTO 3 buckets 
+row format delimited 
+fields terminated by ',' 
+lines terminated by '\n';
+
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+set hive.enforce.bucketing=true;
+set hive.exec.dynamic.partition.pernode = 2000;
+
+from batting ba INSERT OVERWRITE TABLE batting_part PARTITION(teamID) select ba.playerID, ba.yearID, ba.stint, ba.lgID, ba.G, ba.G_batting, ba.AB, ba.R, ba.H, ba.twoB, ba.threeB, ba.HR, ba.RBI, ba.SB, ba.CS, ba.BB, ba.SO, ba.IBB, ba.HBP, ba.SH, ba.SF, ba.GIDP, ba.G_old, ba.teamID  DISTRIBUTE BY teamID;
+
+d)
+select * from batting where playerID == "aaronha01";
+
+e)
+select count(distinct(teamID)) from batting;
+
+6)
+Code name playerrcount.py and team count.py
+
+7)
+Code name Visualization.ipynb
+
+8)
+Code name halloffame.py, halloffameb.py, halloffamec.py
+
+
+9. Using hive,partition by year. Then, find the year wise count of participants, 
+find the total votes got by the players.
+
+create table halloffame(hofID STRING, yearid INT, votedBy STRING, ballots INT, needed INT, votes INT,inducted STRING, category STRING, needed_note STRING) row format delimited fields terminated by ',' stored as textfile;
+
+LOAD DATA LOCAL INPATH '/home/cloudera/Lab/DataFiles/HallOfFame.csv' into table halloffame;
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+set hive.enforce.bucketing=true;
+
+create table halloffame_part hof(hofID STRING, votedBy STRING, ballots INT, needed INT, votes INT,inducted STRING, category STRING, needed_note STRING) partitioned by(yearid INT) row format delimited fields terminated by ',' lines terminated by '\n';
+
+from halloffame hof INSERT OVERWRITE TABLE halloffame_part PARTITION(yearid) select hof.hofID, hof.votedBy, hof.ballots, hof.needed, hof.votes, hof.inducted, hof.category, hof.needed_note, hof.yearid  DISTRIBUTE BY yearid;
+
+select yearid, count(hofid) from halloffame_part group by yearid;
+
+select hofid, sum(votes) from halloffame_part group by hofid;
+
+10) code name averageq10.py
+
+
+
+
+
+
+
+
